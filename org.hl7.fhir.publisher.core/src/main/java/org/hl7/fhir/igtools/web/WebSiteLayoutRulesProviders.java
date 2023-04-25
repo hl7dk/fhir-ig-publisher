@@ -373,9 +373,46 @@ public class WebSiteLayoutRulesProviders {
 
   }
 
+  public static class KLNamingRulesProvider extends DefaultNamingRulesProvider{
+
+    @Override
+    public boolean checkNpmId(List<ValidationMessage> res) {
+      /*return check(res, parts.length == 3 && "fhir".equals(parts[0]),
+          "Package Id '"+id+"' is not valid:  must have 3 parts (fhir.[org].[code]");*/
+      return true;
+    }
+    @Override
+    public boolean checkCanonicalAndUrl(List<ValidationMessage> res, String canonical, String url) {
+      return true;
+    }
+
+    private String tail(String canonical) {
+      return canonical.substring(canonical.lastIndexOf("/")+1);
+    }
+
+    public String org() {
+      return parts[0];
+    }
+
+    public String code() {
+      return parts[3];
+    }
+
+    public String getDestination(String rootFolder) throws IOException {
+      return Utilities.path(rootFolder, code());
+    }
+
+    public String desc() {
+      return "Web Layout using the KL defined rules";
+    }
+
+  }
+
   public static WebSiteLayoutRulesProvider recogniseNpmId(String id, String[] p, JsonObject setup) {
     DefaultNamingRulesProvider res = new DefaultNamingRulesProvider();
-    if (id.equals("hl7.terminology")) {
+    if (id.startsWith("kl.fhir.dk"))
+      res = new KLNamingRulesProvider();
+    else if(id.equals("hl7.terminology")) {
       res = new HL7TerminologyNamingRulesProvider();
     } else if (id.equals("hl7.cql")) {
       res = new CQLNamingRulesProvider();
