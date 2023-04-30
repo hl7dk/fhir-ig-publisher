@@ -2093,9 +2093,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         //        else if (specmaps != null && preambles.has(map.getUri()))   
         //          s.append(preambles.get(map.getUri()).getAsString());
 
-        s.append("<table class=\"grid\">\r\n");
 
-        s.append(" <tr><td colspan=\"3\"><b>" + Utilities.escapeXml(gt(sd.getNameElement())) + "</b></td></tr>\r\n");
+        boolean hasComments = false;
         String path = null;
         for (ElementDefinition e : diff ? sd.getDifferential().getElement() : sd.getSnapshot().getElement()) {
           if (path == null || !e.getPath().startsWith(path)) {
@@ -2103,7 +2102,20 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             if (e.hasMax() && e.getMax().equals("0") || !(complete || hasMappings(e, map))) {
               path = e.getPath() + ".";
             } else
-              genElement(s, e, map.getIdentity());
+              hasComments = checkGenElementComments(e, map.getIdentity()) || hasComments;
+          }  
+        }
+        
+        s.append("<table class=\"grid\">\r\n");
+        s.append(" <tr><td colspan=\"3\"><b>" + Utilities.escapeXml(gt(sd.getNameElement())) + "</b></td></tr>\r\n");
+        path = null;
+        for (ElementDefinition e : diff ? sd.getDifferential().getElement() : sd.getSnapshot().getElement()) {
+          if (path == null || !e.getPath().startsWith(path)) {
+            path = null;
+            if (e.hasMax() && e.getMax().equals("0") || !(complete || hasMappings(e, map))) {
+              path = e.getPath() + ".";
+            } else
+              genElement(s, e, map.getIdentity(), hasComments);
           }
         }
         s.append("</table>\r\n");
@@ -2157,7 +2169,16 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return false;
   }
 
-  private void genElement(StringBuilder s, ElementDefinition e, String id) {
+  private boolean checkGenElementComments(ElementDefinition e, String id) {
+    List<ElementDefinitionMappingComponent> ml = getMap(e, id);
+    for (ElementDefinitionMappingComponent m : ml) {
+      if (m.hasComment()) {
+        return true;
+      }
+    }
+    return false;
+  }
+  private void genElement(StringBuilder s, ElementDefinition e, String id, boolean comments) {
     s.append(" <tr><td>");
     boolean root = true;
     for (char c : e.getPath().toCharArray())
@@ -2190,6 +2211,21 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
       s.append("</td>");
     }
+    if (comments) {
+      if (ml.isEmpty())
+        s.append("<td></td>");
+      else {
+        s.append("<td>");
+        boolean first = true;
+        for (ElementDefinitionMappingComponent m : ml) {
+          if (first) first = false;
+          else s.append(", ");
+          s.append(Utilities.escapeXml(m.getComment()));
+        }
+        s.append("</td>");
+      }
+    }
+
     s.append(" </tr>\r\n");
   }
 
@@ -2311,6 +2347,52 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
               String title = r.getTitle();
               if (Utilities.noString(title))
                 name = "example";
+              if (f.getTitle() != null && f.getTitle() != f.getName())
+                title = f.getTitle();
+              String ref = igp.getLinkFor(r, true);
+              b.append(" <tr>\r\n");
+              b.append("   <td><a href=\"" + Utilities.escapeXml(ref) + "\">" + Utilities.escapeXml(name) + "</a></td>\r\n");
+              b.append("   <td>" + Utilities.escapeXml(title) + "</td>\r\n");
+              b.append(" </tr>\r\n");
+            }
+          }
+        }
+      }
+    }
+    return b.toString();
+  }
+
+  public String testplanList(List<FetchedFile> fileList) {
+    StringBuilder b = new StringBuilder();
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.fhirType().equals("TestPlan")) {
+  	      for (String p : r.getTestArtifacts()) {
+            if (sd.getUrl().equals(p)) {
+              String name = r.getTitle();
+              if (Utilities.noString(name))
+                name = "TestPlan";
+              String ref = igp.getLinkFor(r, true);
+              b.append(" <li><a href=\"" + Utilities.escapeXml(ref) + "\">" + Utilities.escapeXml(name) + "</a></li>\r\n");
+            }
+          }
+        }
+      }
+    }
+    return b.toString();
+  }
+
+  public String testplanTable(List<FetchedFile> fileList) {
+    StringBuilder b = new StringBuilder();
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.fhirType().equals("TestPlan")) {
+          for (String p : r.getTestArtifacts()) {
+            if (sd.getUrl().equals(p)) {
+              String name = r.fhirType() + "/" + r.getId();
+              String title = r.getTitle();
+              if (Utilities.noString(title))
+                name = "TestPlan";
               if (f.getTitle() != null && f.getTitle() != f.getName())
                 title = f.getTitle();
               String ref = igp.getLinkFor(r, true);
